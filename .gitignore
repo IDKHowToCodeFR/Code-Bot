@@ -1,0 +1,17 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Environment variables file
+.env
+
+# SQLite database file (if local DB file should not be committed)
+*.db
+*.sqlite3
+
+# VSCode settings (optional)
+.vscode/
+
+# Logs and temp files
+*.log
+*.tmp
