@@ -1,25 +1,32 @@
+# ============================== #
+#        CodeBot Response        #
+# ============================== #
+
+# --- Imports ---
 import os
 from dotenv import load_dotenv
 import cohere
 from db import get_user_history
 import asyncio
 
+# --- Load Environment Variables ---
 load_dotenv()
-instr_query: str = os.getenv("SYSTEM_INSTR_MSG", "")
-instr_dbg: str = os.getenv("SYSTEM_INSTR_DBT", "")
-instr_strict: str = os.getenv("SYSTEM_INSTR_STRICT", "")
+instr_query: str = os.getenv("SYSTEM_INSTR_MSG")       # Instruction for regular queries
+instr_dbg: str = os.getenv("SYSTEM_INSTR_DBT")         # Instruction for debugging
+instr_strict: str = os.getenv("SYSTEM_INSTR_STRICT")   # Extra strict enforcement prompt
 
-client = cohere.ClientV2(api_key=os.getenv("AI_API_KEY"))  # reused single instance
+# --- Initialize Cohere Client (Singleton) ---
+client = cohere.ClientV2(api_key=os.getenv("AI_API_KEY"))
 
+# --- Helper: Build Prompt with User History ---
 async def build_prompt(prompt: str, user_id: int) -> str:
-    history = "".join(await get_user_history(user_id))
+    history = "".join(await get_user_history(user_id))  # Retrieve past interactions
     full_prompt = f"{history}\nQ: {prompt}\nA:" if history else f"Q: {prompt}\nA:"
     return full_prompt
 
+# --- Query Handler (General Code Help) ---
 async def query(prompt: str, user_id: int) -> str:
     full_prompt  = await build_prompt(prompt, user_id)
-    # If client.chat() is synchronous, consider:
-    # response = await asyncio.to_thread(client.chat, model="command-a-03-2025", messages=[...])
     response = client.chat(
         model="command-a-03-2025",
         messages=[
@@ -29,8 +36,8 @@ async def query(prompt: str, user_id: int) -> str:
     )
     return response.message.content[0].text
 
+# --- Debug Handler (Bug Fixing / Review) ---
 async def debug(prompt: str, user_id: int) -> str:
-    # history = "".join(get_user_history(user_id))
     full_prompt = await build_prompt(prompt, user_id)
     response = client.chat(
         model="command-a-03-2025",
@@ -41,7 +48,8 @@ async def debug(prompt: str, user_id: int) -> str:
     )
     return response.message.content[0].text
 
-async def resources(topic: str, n :int) -> str:
+# --- Resource Finder (Learning Links) ---
+async def resources(topic: str, n: int) -> str:
     response = client.chat(
         model="command-a-03-2025",
         messages=[
@@ -51,7 +59,8 @@ async def resources(topic: str, n :int) -> str:
     )
     return response.message.content[0].text
 
-async def tips(topic: str , n : int) -> str:
+# --- Tip Generator (Coding Advice) ---
+async def tips(topic: str, n: int) -> str:
     response = client.chat(
         model="command-a-03-2025",
         messages=[
@@ -61,6 +70,7 @@ async def tips(topic: str , n : int) -> str:
     )
     return response.message.content[0].text
 
+# --- Help Menu Text ---
 def chelp():
     return (
         "**📌 Available Commands:**\n"
@@ -71,8 +81,9 @@ def chelp():
         "• `📚 /resources <topic>` — *Get curated learning material*\n"
         "• `📝 /tips <topic>` — *Receive a random tip related to topic*\n"
         "• `🆘 /chelp` — *Display this help message menu*\n\n"
-        "*Type a command to get started. Happy coding!*"
+        "**Type a command to get started. Happy coding!**"
     )
 
+# --- Error Fallback Text ---
 def error():
     return "⚠️ An error occurred while processing your request."

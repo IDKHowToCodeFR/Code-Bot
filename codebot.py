@@ -2,38 +2,43 @@
 #         CodeBot Main           #
 # ============================== #
 
+# --- Imports ---
 import os
 import logging
 import discord
-import response
+import response  # Your custom module that handles API interaction
 from dotenv import load_dotenv
 from discord import Embed, Intents
 from discord.ext import commands
-from db import initialize, store_user_response
+from db import initialize, store_user_response  # DB-related logic
 
+# --- Load Bot Token ---
 load_dotenv()
-
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# Setup logging
+# --- Setup Logging ---
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("CodeBot")
 
+# --- Set Required Intents ---
 intents = Intents.default()
-intents.message_content = True
+intents.message_content = True  # Required for reading user messages
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+
+# --- Embed Helper: Split large messages into chunks and send as embeds ---
 async def send_chunks(send_func, content: str):
     if not isinstance(content, str):
         content = str(content)
+
     content = content.strip()
     if not content:
         await send_func(content="Sorry, I couldn't generate a response.")
         return
 
-    max_length = 2000
-    chunks = [content[i:i + max_length] for i in range(0, len(content), max_length)]
+    # Split content into chunks of 2000 characters (Discord limit)
+    chunks = [content[i:i + 2000] for i in range(0, len(content), 2000)]
 
     for chunk in chunks:
         embed = Embed(
@@ -41,12 +46,21 @@ async def send_chunks(send_func, content: str):
             description=chunk,
             color=0x00ff99
         )
-        embed.set_footer(text="Type /chelp for help")
+        # Add footer with owner's name
+        app_info = await bot.application_info()
+        owner = app_info.owner
+        embed.set_footer(text=f"Type /chelp for help • Made by {owner.name}")
         try:
             await send_func(embed=embed)
         except Exception as e:
             logger.error(f"Failed to send chunk: {e}")
 
+
+# ============================== #
+#      Slash Command Handlers    #
+# ============================== #
+
+# --- Public code help (in current channel) ---
 @bot.tree.command(name="coh", description="Get your query answered in current channel")
 async def code_help_public(interaction: discord.Interaction, query: str):
     try:
@@ -60,11 +74,10 @@ async def code_help_public(interaction: discord.Interaction, query: str):
         logger.warning("Interaction expired before we could respond.")
     except Exception as e:
         logger.error(f"[ERROR] /coh - {e}", exc_info=True)
-        try:
-            await send_chunks(interaction.followup.send, response.error())
-        except Exception as inner:
-            logger.error(f"Failed to send error message: {inner}")
+        await send_chunks(interaction.followup.send, response.error())
 
+
+# --- Private code help (via DM) ---
 @bot.tree.command(name="cph", description="Get your query answered privately in your DM")
 async def code_help_private(interaction: discord.Interaction, query: str):
     if interaction.guild is None:
@@ -89,8 +102,9 @@ async def code_help_private(interaction: discord.Interaction, query: str):
             logger.error(f"[ERROR] /cph - {e}", exc_info=True)
             await send_chunks(interaction.followup.send, response.error())
 
-@bot.tree.command(name="debug", description="Ask debugs related to code")
-async def code_debug(interaction: discord.Interaction, query: str):
+# --- General code doubt ---
+@bot.tree.command(name="doubt", description="Ask doubt related to code")
+async def code_dbg(interaction: discord.Interaction, query: str):
     try:
         if interaction.response.is_done():
             return
@@ -99,36 +113,42 @@ async def code_debug(interaction: discord.Interaction, query: str):
         await store_user_response(interaction.user.id, query, result)
         await send_chunks(interaction.followup.send, result)
     except Exception as e:
-        logger.error(f"[ERROR] /debug - {e}", exc_info=True)
+        logger.error(f"[ERROR] /doubt - {e}", exc_info=True)
         await send_chunks(interaction.followup.send, response.error())
 
+
+# --- Debug code ---
 @bot.tree.command(name="debug", description="Provide code for debug")
-async def debug_code(interaction: discord.Interaction, code: str):
+async def dbg_code(interaction: discord.Interaction, code: str):
     try:
         if interaction.response.is_done():
             return
         await interaction.response.defer()
-        result = await response.debug(code, interaction.user.id)
+        result = await response.dbg(code, interaction.user.id)
         await store_user_response(interaction.user.id, code, result)
         await send_chunks(interaction.followup.send, result)
     except Exception as e:
         logger.error(f"[ERROR] /debug - {e}", exc_info=True)
         await send_chunks(interaction.followup.send, response.error())
 
+
+# --- Resource recommendation ---
 @bot.tree.command(name="resources", description="Get resources on a topic")
-async def resources(interaction: discord.Interaction, topic: str, n : int = 3):
+async def resources(interaction: discord.Interaction, topic: str, n: int = 3):
     try:
         if interaction.response.is_done():
             return
         await interaction.response.defer()
-        result = await response.resources(topic , n) 
+        result = await response.resources(topic, n)
         await send_chunks(interaction.followup.send, result)
     except Exception as e:
         logger.error(f"[ERROR] /resources - {e}", exc_info=True)
         await send_chunks(interaction.followup.send, response.error())
 
+
+# --- Tips on a topic ---
 @bot.tree.command(name="tips", description="Get tips on a topic")
-async def tips(interaction: discord.Interaction, topic: str , n : int = 1):
+async def tips(interaction: discord.Interaction, topic: str, n: int = 1):
     try:
         if interaction.response.is_done():
             return
@@ -139,6 +159,8 @@ async def tips(interaction: discord.Interaction, topic: str , n : int = 1):
         logger.error(f"[ERROR] /tips - {e}", exc_info=True)
         await send_chunks(interaction.followup.send, response.error())
 
+
+# --- Help command ---
 @bot.tree.command(name="chelp", description="Display help menu")
 async def show_help(interaction: discord.Interaction):
     try:
@@ -151,14 +173,25 @@ async def show_help(interaction: discord.Interaction):
         logger.error(f"[ERROR] /chelp - {e}", exc_info=True)
         await send_chunks(interaction.followup.send, response.error())
 
+
+# ============================== #
+#           Events               #
+# ============================== #
+
+# --- Bot Ready Event ---
 @bot.event
 async def on_ready():
     logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
     try:
-        await initialize()  # DB initialization
-        await bot.tree.sync()  # Sync slash commands once on ready
+        await initialize()  # Initialize the SQLite DB
+        await bot.tree.sync()  # Sync slash commands with Discord
         logger.info("Slash commands synced successfully.")
     except Exception as e:
         logger.error(f"Failed during on_ready initialization: {e}")
+
+
+# ============================== #
+#         Run the Bot            #
+# ============================== #
 
 bot.run(TOKEN)

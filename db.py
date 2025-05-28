@@ -2,16 +2,19 @@
 #         Database Module        #
 # ============================== #
 
+# --- Imports ---
 import aiosqlite
 import os
 from dotenv import load_dotenv
 
+# --- Load Environment Variables ---
 load_dotenv()
-DB_NAME = os.getenv("USER_CONTEXT")
+DB_NAME = os.getenv("USER_CONTEXT")  # SQLite DB filename from .env
 
-# Keep a persistent connection for better performance
-_db_connection = None
+# --- Persistent DB Connection ---
+_db_connection = None  # Global connection to avoid repeated opening
 
+# --- Initialize DB (Create Table + Index) ---
 async def initialize():
     global _db_connection
     if _db_connection is None:
@@ -25,21 +28,25 @@ async def initialize():
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        # Create index on user_id and timestamp for faster queries
-        await _db_connection.execute("CREATE INDEX IF NOT EXISTS idx_user_time ON user_responses(user_id, timestamp);")
+        # Index for fast lookup by user and time
+        await _db_connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_time ON user_responses(user_id, timestamp);"
+        )
         await _db_connection.commit()
 
+# --- Store a User's Prompt + Response ---
 async def store_user_response(user_id: int, prompt: str, response: str):
-    # Use persistent connection instead of opening a new one every time
     await _db_connection.execute(
         "INSERT INTO user_responses (user_id, prompt, response) VALUES (?, ?, ?)",
         (user_id, prompt, response)
     )
     await _db_connection.commit()
 
+# --- Fetch User History (Truncate to max_chars) ---
 async def get_user_history(user_id: int, max_chars: int = 1500):
     """
-    Get user history limited by total characters rather than rows for better prompt size control.
+    Returns a list of Q&A strings for a user, capped by total character length.
+    Newest entries are included first, but returned oldest-first for prompt building.
     """
     async with _db_connection.execute(
         "SELECT prompt, response FROM user_responses WHERE user_id = ? ORDER BY timestamp DESC",
@@ -47,10 +54,9 @@ async def get_user_history(user_id: int, max_chars: int = 1500):
     ) as cursor:
         rows = await cursor.fetchall()
 
-    # Build history until max_chars limit reached
     history = []
     total_len = 0
-    for prompt, response in reversed(rows):  # oldest first
+    for prompt, response in reversed(rows):  # oldest to newest
         entry = f"Q: {prompt}\nA: {response}\n"
         total_len += len(entry)
         if total_len > max_chars:
