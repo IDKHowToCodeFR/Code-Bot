@@ -79,12 +79,6 @@ Use the following slash commands inside Discord once the bot is running:
 
 ---
 
-## 🤝 CONTRIBUTING
-
-Contributions, issues, and feature requests are welcome!  
-Feel free to check the [issues page](https://github.com/IDKHowToCodeFR/Code-Bot/issues).
-
----
 ## 🌐 PROJECT STRUCTURE
 ```
 Code-Bot/
@@ -97,12 +91,20 @@ Code-Bot/
 └── README.md           # This file
 ```
 ---
+
 ## 📑 Notes
 User history is stored in an SQLite database specified by `USER_CONTEXT` in `.env`.
 
 The bot splits long responses into Discord-friendly embed messages.
 
 Handles errors and privacy restrictions gracefully (e.g., if DMs are blocked).
+---
+
+## 🤝 CONTRIBUTING
+
+Contributions, issues, and feature requests are welcome!  
+Feel free to check the [issues page](https://github.com/IDKHowToCodeFR/Code-Bot/issues).
+
 ---
 
 ## 📜 LICENSE
