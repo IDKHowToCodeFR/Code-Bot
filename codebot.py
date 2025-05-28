@@ -2,145 +2,163 @@
 #         CodeBot Main           #
 # ============================== #
 
-# ---------- Imports ----------
 import os
+import logging
 import discord
+import response
 from dotenv import load_dotenv
-from typing import Final
 from discord import Embed, Intents
 from discord.ext import commands
-from db import UserResponseDB
-from response import CohereAssistant
+from db import initialize, store_user_response
 
-# ---------- Load Environment Variables ----------
 load_dotenv()
-TOKEN: Final[str] = os.getenv("DISCORD_BOT_TOKEN")
 
-# ---------- CodeBot Class ----------
-class CodeBot:
-    def __init__(self):
-        intents = Intents.default()
-        intents.message_content = True  # Enable reading message content
-        self.bot = commands.Bot(command_prefix='!', intents=intents)
-        self.db = UserResponseDB()  # Initialize user response DB
-        self.ai = CohereAssistant()  # Initialize AI assistant
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-    # ---------- Send Embed Messages in Chunks ----------
-    @staticmethod
-    async def send_chunks(send_func, content: str):
-        if not isinstance(content, str):
-            content = str(content)
-        if content.strip():
-            chunks = [content[i:i + 2000] for i in range(0, len(content), 2000)]  # Split by Discord message limit
-            for chunk in chunks:
-                embed = discord.Embed(
-                    title="Code - Bot",
-                    description=chunk,
-                    color=0x00ff99
-                )
-                embed.set_footer(text="Type /chelp for help")
-                await send_func(embed=embed)
-        else:
-            await send_func(content="Sorry, I couldn't generate a response.")  # Handle empty response
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logger = logging.getLogger("CodeBot")
 
-    # ---------- Handle Queries ----------
-    async def handle_query(self, interaction, query, is_dm=False):
+intents = Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+async def send_chunks(send_func, content: str):
+    if not isinstance(content, str):
+        content = str(content)
+    content = content.strip()
+    if not content:
+        await send_func(content="Sorry, I couldn't generate a response.")
+        return
+
+    max_length = 2000
+    chunks = [content[i:i + max_length] for i in range(0, len(content), max_length)]
+
+    for chunk in chunks:
+        embed = Embed(
+            title="Code - Bot",
+            description=chunk,
+            color=0x00ff99
+        )
+        embed.set_footer(text="Type /chelp for help")
         try:
-            await interaction.response.defer()  # Defer response for processing time
-            result = await self.ai.query(query, interaction.user.id)
-            await self.db.store_response(interaction.user.id, query, result)  # Save to DB for context
-            if is_dm:
-                await self.send_chunks(interaction.user.send, result)
-                await self.send_chunks(interaction.followup.send, "Check your DM")
-            else:
-                await self.send_chunks(interaction.followup.send, result)
+            await send_func(embed=embed)
+        except Exception as e:
+            logger.error(f"Failed to send chunk: {e}")
+
+@bot.tree.command(name="coh", description="Get your query answered in current channel")
+async def code_help_public(interaction: discord.Interaction, query: str):
+    try:
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer(thinking=True)
+        result = await response.query(query, interaction.user.id)
+        await store_user_response(interaction.user.id, query, result)
+        await send_chunks(interaction.followup.send, result)
+    except discord.NotFound:
+        logger.warning("Interaction expired before we could respond.")
+    except Exception as e:
+        logger.error(f"[ERROR] /coh - {e}", exc_info=True)
+        try:
+            await send_chunks(interaction.followup.send, response.error())
+        except Exception as inner:
+            logger.error(f"Failed to send error message: {inner}")
+
+@bot.tree.command(name="cph", description="Get your query answered privately in your DM")
+async def code_help_private(interaction: discord.Interaction, query: str):
+    if interaction.guild is None:
+        await code_help_public(interaction=interaction, query=query)
+    else:
+        try:
+            if interaction.response.is_done():
+                return
+            await interaction.response.defer()
+            await send_chunks(interaction.followup.send, "Check your DM 🫣🫣")
+            result = await response.query(query, interaction.user.id)
+            await store_user_response(interaction.user.id, query, result)
+            await send_chunks(interaction.user.send, result)
         except discord.Forbidden:
-            await self.send_chunks(
+            logger.error(f"[ERROR] /cph - Cannot DM user {interaction.user}")
+            await send_chunks(
                 interaction.followup.send,
-                "❌ I couldn't DM you. Please check your privacy settings."
+                ("❌ I couldn't DM you. Please check your privacy settings to allow messages from server members.\n\n"
+                 "**To receive help in DMs, go to:**\n*Server Settings → Privacy Settings → Enable DMs from server members*")
             )
         except Exception as e:
-            print(f"[ERROR] handle_query - {e}")
-            await self.send_chunks(interaction.followup.send, self.ai.error_message())
+            logger.error(f"[ERROR] /cph - {e}", exc_info=True)
+            await send_chunks(interaction.followup.send, response.error())
 
-    # ---------- Register Slash Commands ----------
-    def register_commands(self):
-        @self.bot.tree.command(name="coh", description="Get your query answered in current channel")
-        async def code_help_public(interaction: discord.Interaction, query: str):
-            await self.handle_query(interaction, query, is_dm=False)
+@bot.tree.command(name="debug", description="Ask debugs related to code")
+async def code_debug(interaction: discord.Interaction, query: str):
+    try:
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer()
+        result = await response.query(query, interaction.user.id)
+        await store_user_response(interaction.user.id, query, result)
+        await send_chunks(interaction.followup.send, result)
+    except Exception as e:
+        logger.error(f"[ERROR] /debug - {e}", exc_info=True)
+        await send_chunks(interaction.followup.send, response.error())
 
-        @self.bot.tree.command(name="cph", description="Get your query answered privately in your DM")
-        async def code_help_private(interaction: discord.Interaction, query: str):
-            if interaction.guild is None:
-                await code_help_public(interaction=interaction, query=query)  # Already in DM
-            else:
-                await self.handle_query(interaction, query, is_dm=True)
+@bot.tree.command(name="debug", description="Provide code for debug")
+async def debug_code(interaction: discord.Interaction, code: str):
+    try:
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer()
+        result = await response.debug(code, interaction.user.id)
+        await store_user_response(interaction.user.id, code, result)
+        await send_chunks(interaction.followup.send, result)
+    except Exception as e:
+        logger.error(f"[ERROR] /debug - {e}", exc_info=True)
+        await send_chunks(interaction.followup.send, response.error())
 
-        @self.bot.tree.command(name="dbt", description="Ask doubts related to code")
-        async def code_doubt(interaction: discord.Interaction, query: str):
-            try:
-                await interaction.response.defer()
-                result = await self.ai.query(query, interaction.user.id)
-                await self.db.store_response(interaction.user.id, query, result)
-                await self.send_chunks(interaction.followup.send, result)
-            except Exception as e:
-                print(f"[ERROR] /dbt - {e}")
-                await self.send_chunks(interaction.followup.send, self.ai.error_message())
+@bot.tree.command(name="resources", description="Get resources on a topic")
+async def resources(interaction: discord.Interaction, topic: str, n : int = 3):
+    try:
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer()
+        result = await response.resources(topic , n) 
+        await send_chunks(interaction.followup.send, result)
+    except Exception as e:
+        logger.error(f"[ERROR] /resources - {e}", exc_info=True)
+        await send_chunks(interaction.followup.send, response.error())
 
-        @self.bot.tree.command(name="debug", description="Provide code for debug")
-        async def debug_code(interaction: discord.Interaction, code: str):
-            try:
-                await interaction.response.defer()
-                result = await self.ai.doubt(code, interaction.user.id)
-                await self.db.store_response(interaction.user.id, code, result)
-                await self.send_chunks(interaction.followup.send, result)
-            except Exception as e:
-                print(f"[ERROR] /debug - {e}")
-                await self.send_chunks(interaction.followup.send, self.ai.error_message())
+@bot.tree.command(name="tips", description="Get tips on a topic")
+async def tips(interaction: discord.Interaction, topic: str , n : int = 1):
+    try:
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer()
+        result = await response.tips(topic, n)
+        await send_chunks(interaction.followup.send, result)
+    except Exception as e:
+        logger.error(f"[ERROR] /tips - {e}", exc_info=True)
+        await send_chunks(interaction.followup.send, response.error())
 
-        @self.bot.tree.command(name="resources", description="Generate useful resources")
-        async def recommend_resources(interaction: discord.Interaction, topic: str, number : int):
-            try:
-                await interaction.response.defer()
-                resource = await self.ai.resources(topic,number)
-                await self.send_chunks(interaction.followup.send, resource)
-            except Exception as e:
-                print(f"[ERROR] /resources - {e}")
-                await self.send_chunks(interaction.followup.send, self.ai.error_message())
+@bot.tree.command(name="chelp", description="Display help menu")
+async def show_help(interaction: discord.Interaction):
+    try:
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer()
+        help_text = response.chelp()
+        await send_chunks(interaction.followup.send, help_text)
+    except Exception as e:
+        logger.error(f"[ERROR] /chelp - {e}", exc_info=True)
+        await send_chunks(interaction.followup.send, response.error())
 
-        @self.bot.tree.command(name="tips", description="Generate random tips related to any topic")
-        async def random_tip(interaction: discord.Interaction, topic: str, number : int):
-            try:
-                await interaction.response.defer()
-                tip = await self.ai.tips(topic, number)
-                await self.send_chunks(interaction.followup.send, tip)
-            except Exception as e:
-                print(f"[ERROR] /tips - {e}")
-                await self.send_chunks(interaction.followup.send, self.ai.error_message())
+@bot.event
+async def on_ready():
+    logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    try:
+        await initialize()  # DB initialization
+        await bot.tree.sync()  # Sync slash commands once on ready
+        logger.info("Slash commands synced successfully.")
+    except Exception as e:
+        logger.error(f"Failed during on_ready initialization: {e}")
 
-        @self.bot.tree.command(name="chelp", description="Help menu")
-        async def code_help_info(interaction: discord.Interaction):
-            try:
-                await interaction.response.defer()
-                await self.send_chunks(interaction.followup.send, self.ai.help_message())
-            except Exception as e:
-                print(f"[ERROR] /chelp - {e}")
-                await self.send_chunks(interaction.followup.send, self.ai.error_message())
-
-    # ---------- Bot Ready Event ----------
-    async def on_ready(self):
-        await self.bot.tree.sync()  # Sync commands with Discord
-        await self.db.initialize()  # Prepare database
-        print(f"Bot active : {self.bot.user}")
-
-    # ---------- Run Bot ----------
-    def run(self):
-        @self.bot.event
-        async def on_ready():
-            await self.on_ready()
-        self.register_commands()
-        self.bot.run(TOKEN)
-
-# ---------- Main Execution ----------
-if __name__ == "__main__":
-    CodeBot().run()
+bot.run(TOKEN)
