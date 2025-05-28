@@ -1,21 +1,22 @@
-=================================README - FILE=================================
+=============README - FILE=============
 
 # CODE - BOT
 
 📌 ABOUT
 --------
-CodeBot is a smart Discord bot powered by Cohere's AI models. It helps users with code-related queries, debugging, learning resources, and coding tips. It supports both public and private interaction, maintains user-specific history, and responds using AI-generated answers.
+CodeBot is a smart Discord AI bot powered by Cohere's AI models. It helps users with code-related queries, debugging, learning resources, and coding tips. It supports both public and private interaction, maintains user-specific history, and responds using AI-generated answers.
 
 ✨ FEATURES
 ----------
-- 🔍 **/coh <query>**: Get coding help in the current channel.
-- 📩 **/cph <query>**: Receive AI help via private DM.
-- 🐞 **/debug <code>**: Debug your code and get suggestions.
-- 🧪 **/dbg <code>**: Get AI-powered code improvements.
-- 📚 **/resources <topic>**: Get curated learning material links.
-- 📝 **/tips <topic>**: Receive coding tips related to a topic.
-- 🆘 **/chelp**: Show all available commands.
-- 🧠 Stores per-user interaction history in SQLite.
+- 🔍 **`/coh <query>`**: Get coding help in the current channel.  
+- 📩 **`/cph <query>`**: Receive AI help via private DM.  
+- 🐞 **`/debug <code>`**: Debug your code and get suggestions.  
+- 🧪 **`/dbg <code>`**: Get AI-powered code improvements.  
+- 📚 **`/resources <topic>`**: Get curated learning material links.  
+- 📝 **`/tips <topic>`**: Receive coding tips related to a topic.  
+- 🆘 **`/chelp`**: Show all available commands.  
+- 🧠 Stores per-user interaction history in SQLite.  
+
 
 🛠️ SETUP INSTRUCTIONS
 ---------------------
