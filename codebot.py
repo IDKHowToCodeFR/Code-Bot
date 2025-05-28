@@ -40,9 +40,11 @@ async def send_chunks(send_func, content: str):
     # Split content into chunks of 2000 characters (Discord limit)
     chunks = [content[i:i + 2000] for i in range(0, len(content), 2000)]
 
-    for chunk in chunks:
+    for i, chunk in enumerate(chunks):
+        title = "Code - Bot" if i == 0 else " "
+
         embed = Embed(
-            title="Code - Bot",
+            title=title,
             description=chunk,
             color=0x00ff99
         )
@@ -124,7 +126,7 @@ async def dbg_code(interaction: discord.Interaction, code: str):
         if interaction.response.is_done():
             return
         await interaction.response.defer()
-        result = await response.dbg(code, interaction.user.id)
+        result = await response.debug(code, interaction.user.id)
         await store_user_response(interaction.user.id, code, result)
         await send_chunks(interaction.followup.send, result)
     except Exception as e:
