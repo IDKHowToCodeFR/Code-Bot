@@ -11,8 +11,8 @@ import asyncio
 
 # --- Load Environment Variables ---
 load_dotenv()
-instr_query: str = os.getenv("SYSTEM_INSTR_MSG")       # Instruction for regular queries
-instr_dbg: str = os.getenv("SYSTEM_INSTR_DBT")         # Instruction for debugging
+instr_query : str = os.getenv("SYSTEM_INSTR_MSG")       # Instruction for regular queries
+instr_dbg : str = os.getenv("SYSTEM_INSTR_DBT")         # Instruction for debugging
 instr_strict: str = os.getenv("SYSTEM_INSTR_STRICT")   # Extra strict enforcement prompt
 
 # --- Initialize Cohere Client (Singleton) ---
@@ -30,7 +30,7 @@ async def query(prompt: str, user_id: int) -> str:
     response = client.chat(
         model="command-a-03-2025",
         messages=[
-            {"role": "system", "content": instr_query + instr_strict},
+            {"role": "system", "content": instr_query + instr_strict },
             {"role": "user", "content": full_prompt},
         ],
     )
@@ -42,7 +42,7 @@ async def debug(prompt: str, user_id: int) -> str:
     response = client.chat(
         model="command-a-03-2025",
         messages=[
-            {"role": "system", "content": instr_dbg + instr_strict},
+            {"role": "system", "content": instr_dbg + instr_strict },
             {"role": "user", "content": full_prompt},
         ],
     )
@@ -53,7 +53,7 @@ async def resources(topic: str, n: int) -> str:
     response = client.chat(
         model="command-a-03-2025",
         messages=[
-            {"role": "system", "content": instr_query + instr_strict},
+            {"role": "system", "content": instr_query + instr_strict },
             {"role": "user", "content": f"Give me links to at least {n} resources related to {topic}."}
         ],
     )
@@ -64,7 +64,7 @@ async def tips(topic: str, n: int) -> str:
     response = client.chat(
         model="command-a-03-2025",
         messages=[
-            {"role": "system", "content": instr_query + instr_strict},
+            {"role": "system", "content": instr_query + instr_strict },
             {"role": "user", "content": f"Give me {n} random tips related to {topic}."}
         ],
     )

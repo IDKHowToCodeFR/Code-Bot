@@ -51,7 +51,7 @@ async def send_chunks(send_func, content: str):
         # Add footer with owner's name
         app_info = await bot.application_info()
         owner = app_info.owner
-        embed.set_footer(text=f"Type /chelp for help • Made by {owner.name}")
+        embed.set_footer(text=f"Type /chelp for help • Made by @{owner.name}")
         try:
             await send_func(embed=embed)
         except Exception as e:
