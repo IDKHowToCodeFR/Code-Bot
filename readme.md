@@ -88,6 +88,7 @@ Code-Bot/
 ├── db.py               # SQLite database interface for user history
 ├── requirements.txt    # Python dependencies
 ├── .env                # Environment variables (not committed)
+├── Procfile            # Procfile for depolyment
 └── README.md           # This file
 ```
 ---
@@ -95,9 +96,9 @@ Code-Bot/
 ## 📑 Notes
 User history is stored in an SQLite database specified by `USER_CONTEXT` in `.env`.
 
-The bot splits long responses into Discord-friendly embed messages.
-
+The bot splits long responses into Discord-friendly embed messages.  
 Handles errors and privacy restrictions gracefully (e.g., if DMs are blocked).
+
 ---
 
 ## 🤝 CONTRIBUTING
