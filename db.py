@@ -43,7 +43,7 @@ async def store_user_response(user_id: int, prompt: str, response: str):
     await _db_connection.commit()
 
 # --- Fetch User History (Truncate to max_chars) ---
-async def get_user_history(user_id: int, max_chars: int = 1500):
+async def get_user_history(user_id: int, max_chars: int = 150000):
     """
     Returns a list of Q&A strings for a user, capped by total character length.
     Newest entries are included first, but returned oldest-first for prompt building.
