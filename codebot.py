@@ -10,6 +10,7 @@ import response  # Your custom module that handles API interaction
 from dotenv import load_dotenv
 from discord import Embed, Intents
 from discord.ext import commands
+import textwrap
 from db import initialize, store_user_response  # DB-related logic
 
 # --- Load Bot Token ---
@@ -28,34 +29,77 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 
 # --- Embed Helper: Split large messages into chunks and send as embeds ---
+CODE_BLOCK = "```"
+
 async def send_chunks(send_func, content: str):
     if not isinstance(content, str):
         content = str(content)
 
     content = content.strip()
     if not content:
+        # Handle case where there's nothing meaningful to send
         await send_func(content="Sorry, I couldn't generate a response.")
         return
 
-    # Split content into chunks of 2000 characters (Discord limit)
-    chunks = [content[i:i + 2000] for i in range(0, len(content), 2000)]
+    chunks = []         # Final list of message segments to send
+    current = []        # Current chunk being assembled
+    length = 0          # Character count of current chunk
+    in_code_block = False  # Track if we're inside a code block
 
+    # Work line-by-line to preserve formatting and avoid mid-line breaks
+    lines = content.splitlines(keepends=True)
+    for line in lines:
+        stripped = line.strip()
+
+        # Toggle code block tracking when encountering ```
+        if stripped.startswith(CODE_BLOCK):
+            in_code_block = not in_code_block
+
+        # If adding this line exceeds Discord's limit, start a new chunk
+        if length + len(line) > 2000:
+            if in_code_block:
+                # Close open code block before breaking to next chunk
+                current.append(CODE_BLOCK + "\n")
+                chunks.append("".join(current))
+
+                # Reopen code block in the new chunk
+                current = [CODE_BLOCK + "\n"]
+                length = len(CODE_BLOCK) + len(line)
+            else:
+                chunks.append("".join(current))
+                current = []
+                length = len(line)
+
+        current.append(line)
+        length += len(line)
+
+    # Add remaining chunk if any
+    if current:
+        if in_code_block and not current[-1].strip().startswith(CODE_BLOCK):
+            # Close any unterminated code block
+            current.append(CODE_BLOCK + "\n")
+        chunks.append("".join(current))
+
+    # Send each chunk as a Discord embed
     for i, chunk in enumerate(chunks):
-        title = "Code - Bot" if i == 0 else " "
+        title = "Code - Bot" if i == 0 else " "  # Title only on first embed
 
         embed = Embed(
             title=title,
-            description=chunk,
+            description=chunk[:2000],  # Hard cap to prevent Discord API error
             color=0x00ff99
         )
-        # Add footer with owner's name
+
+        # Fetch bot owner to show in footer
         app_info = await bot.application_info()
         owner = app_info.owner
         embed.set_footer(text=f"Type /chelp for help • Made by @{owner.name}")
+
         try:
             await send_func(embed=embed)
         except Exception as e:
             logger.error(f"Failed to send chunk: {e}")
+
 
 
 # ============================== #
