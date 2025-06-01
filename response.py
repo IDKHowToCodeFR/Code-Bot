@@ -15,6 +15,22 @@ instr_query : str = os.getenv("SYSTEM_INSTR_MSG")       # Instruction for regula
 instr_dbg : str = os.getenv("SYSTEM_INSTR_DBT")         # Instruction for debugging
 instr_strict: str = os.getenv("SYSTEM_INSTR_STRICT")   # Extra strict enforcement prompt
 
+# --- Strict Response ---
+# Parse boolean from env
+strict: bool = os.getenv("STRICT", "true").lower() in ("true", "1", "yes", "y")
+
+# Track original (unmodified) instructions to avoid appending repeatedly
+_base_query = instr_query
+_base_dbg = instr_dbg
+
+# Update strictness flag and system instructions
+async def set_strict(value: str) -> str:
+    global strict, instr_query, instr_dbg
+    strict = value.lower() not in ("n", "no", "nah", "nahh")
+    instr_query = _base_query + (instr_strict if strict else "")
+    instr_dbg = _base_dbg + (instr_strict if strict else "")
+    return "Strictness has been enabled" if strict else "Strictness has been disabled"
+
 # --- Initialize Cohere Client (Singleton) ---
 client = cohere.ClientV2(api_key=os.getenv("AI_API_KEY"))
 
@@ -53,7 +69,7 @@ async def resources(topic: str, n: int) -> str:
     response = client.chat(
         model="command-a-03-2025",
         messages=[
-            {"role": "system", "content": instr_query + instr_strict },
+            {"role": "system", "content": instr_query },
             {"role": "user", "content": f"Give me links to at least {n} resources related to {topic}."}
         ],
     )
@@ -64,7 +80,7 @@ async def tips(topic: str, n: int) -> str:
     response = client.chat(
         model="command-a-03-2025",
         messages=[
-            {"role": "system", "content": instr_query + instr_strict },
+            {"role": "system", "content": instr_query  },
             {"role": "user", "content": f"Give me {n} random tips related to {topic}."}
         ],
     )
@@ -81,6 +97,7 @@ def chelp():
         "• `📚 /resources <topic>` — *Get curated learning material*\n"
         "• `📝 /tips <topic>` — *Receive a random tip related to topic*\n"
         "• `🆘 /chelp` — *Display this help message menu*\n\n"
+        "• `🆘 /strict` — *Toggles the strictness of the bot {Default : True}*\n"
         "**Type a command to get started. Happy coding!**"
     )
 

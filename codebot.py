@@ -219,6 +219,18 @@ async def show_help(interaction: discord.Interaction):
         logger.error(f"[ERROR] /chelp - {e}", exc_info=True)
         await send_chunks(interaction.followup.send, response.error())
 
+# --- Strictness Control ---
+@bot.tree.command(name="strict", description="Toggle Strictness (Default : True) (Type : y / n)")
+async def strictness(interaction : discord.Interaction , value : str):
+    try :
+        if interaction.response.is_done():
+            return
+        await interaction.response.defer()
+        send = await response.set_strict(value)
+        await send_chunks(interaction.followup.send,send)
+    except Exception as e:
+        logger.error(f"[Error] /strict - {e}", exc_info = True)
+        await send_chunks(interaction.followup.send, response.error())
 
 # ============================== #
 #           Events               #
