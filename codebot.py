@@ -10,7 +10,6 @@ import response  # Your custom module that handles API interaction
 from dotenv import load_dotenv
 from discord import Embed, Intents
 from discord.ext import commands
-import textwrap
 from db import initialize, store_user_response  # DB-related logic
 
 # --- Load Bot Token ---

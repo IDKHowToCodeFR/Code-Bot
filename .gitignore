@@ -5,12 +5,9 @@ __pycache__/
 # Environment variables file
 .env
 
-# SQLite database file (if local DB file should not be committed)
+# SQLite database file
 *.db
 *.sqlite3
-
-# VSCode settings (optional)
-.vscode/
 
 # Logs and temp files
 *.log
